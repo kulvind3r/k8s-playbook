@@ -20,6 +20,16 @@ Strictly local usage for doing POCs or Learning how to setup k8s cluster from sc
 * Basebox needs vagrant public insecure key and host ssh key as authorized keys and Vagrant user to be part of suoders group. (*Required for ansible's password less sudo needs*).
 * Internet connectivity for installation. **This is not an offline setup of k8s**
 
+## How to use
+
+Ensure Pre-requisites are met. ssh keys / vagrant in sudoers / internet connectivity etc. Then from root of repo.
+
+1. `vagrant up`
+
+Once vagrant has finished setting up the vms.
+
+2. `ansible-playbook -i inventory.ini site.yml`
+
 ## Planned Features
 
 * Moving etcd out to a separate node.
