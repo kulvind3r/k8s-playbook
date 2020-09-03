@@ -10,10 +10,10 @@ Strictly local usage for doing POCs or Learning how to setup k8s cluster from sc
 
 * VagrantFile to setup desired number of networked virtualbox VMs.
 * Easily Configurable resource allocation for master and worker nodes.
-* Extensible to add multiple master/worker nodes if you have the Hardware for it. ( default 1 each )
+* Extensible to add multiple worker nodes if you have the Hardware for it. ( default 1 )
 * Completely functional k8s cluster setup with Calico CNI from scratch in two commands.
 
-## Pre-requisties
+## Pre-requisites
 
 * Vagrant, VirtualBox and Ansible Installed on Host.
 * Vagrant Basebox to be provided by the user. Tested with Centos 7.8 minimal basebox.
@@ -23,3 +23,4 @@ Strictly local usage for doing POCs or Learning how to setup k8s cluster from sc
 ## Planned Features
 
 * Moving etcd out to a separate node.
+* Setup multi master cluster.

@@ -19,4 +19,9 @@
 - name: Run Kubernetes cluster join command
   become: yes
   shell: |
-    {{ hostvars['cross_play_host']['kubernetes_join_command']}}
+    if [[ "{{ hostvars['cross_play_host']['worker_node_list'] }}" == *"{{ ansible_host }}"* ]]
+    then
+      echo "Node already part of the cluster. Exiting without running join command.";
+      exit 0;
+    fi
+    {{ hostvars['cross_play_host']['kubernetes_join_command'] }}

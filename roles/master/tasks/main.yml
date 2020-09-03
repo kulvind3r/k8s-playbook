@@ -87,7 +87,13 @@
   shell: kubeadm token create --print-join-command 2>null
   register: kubernetes_join_command
 
+- name: Track worker nodes already part of cluster
+  become: yes
+  shell: kubectl get nodes --no-headers -o wide | grep -v master | awk '{print $6}' ORS=" "
+  register: worker_node_list
+
 - name: "Create dummy host to carry values across plays"
   add_host:
     name: "cross_play_host"
     kubernetes_join_command: "{{ kubernetes_join_command.stdout }}"
+    worker_node_list: "{{ worker_node_list.stdout }}"
