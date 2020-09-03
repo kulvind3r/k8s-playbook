@@ -1,0 +1,22 @@
+---
+# Tasks to be executed to setup k8s worker node
+
+# Set Zone for cluster network interface to trusted to allow maximum open state.
+- name: Set Cluster network as trusted in firewalld
+  become: yes
+  command: firewall-cmd --zone=trusted --change-interface=enp0s8
+
+# Open firewall ports for worker nodes
+- name: open ports in firewalld
+  become: yes
+  command: firewall-cmd --zone=trusted --add-port={{ item }} --permanent
+  with_items:
+    - '10250/tcp'
+    - '30000-32767/tcp'
+    - '179/tcp'
+
+# Make node join kubernetes cluster
+- name: Run Kubernetes cluster join command
+  become: yes
+  shell: |
+    {{ hostvars['cross_play_host']['kubernetes_join_command']}}

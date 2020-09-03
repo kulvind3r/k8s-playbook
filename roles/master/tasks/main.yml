@@ -1,0 +1,93 @@
+---
+# Tasks to be executed to setup k8s master node
+
+# Install kubeadm kubelet and kubectl
+- name: Install required pacakges
+  become: yes
+  package:
+    name:
+      - kubectl
+    state: present
+
+# Set Zone for cluster network interface to trusted to allow maximum open state.
+- name: Set Cluster network as trusted in firewalld
+  become: yes
+  command: firewall-cmd --zone=trusted --change-interface=enp0s8
+
+# Open firewall ports for control plane
+- name: open ports in firewalld
+  become: yes
+  command: firewall-cmd --zone=trusted --add-port={{ item }} --permanent
+  with_items:
+    - '6443/tcp'
+    - '2379-2380/tcp'
+    - '10250-10252/tcp'
+    - '179/tcp'
+
+# Validate if kubeadm already initialised
+- name: validate if kubeadm config present
+  become: yes
+  stat:
+    path: "/etc/kubernetes/admin.conf"
+  register: kubernetes_admin_conf
+
+# Initialise kubeadm on master node
+- name: Initialise Kubeadm cluster
+  become: yes
+  command: kubeadm init --pod-network-cidr=172.16.0.0/20 --control-plane-endpoint=masters.kubernetes.vm --apiserver-advertise-address={{ ansible_host }}
+  when: not kubernetes_admin_conf.stat.exists
+
+# Wait for Initialisation to finish
+- name: Wait for Kubernetes Initialisation to finish
+  become: yes
+  wait_for:
+    path: "/etc/kubernetes/admin.conf"
+    sleep: 5
+    timeout: 600
+
+# Setup kubectl on master node
+- name: Setup kubectl on master
+  become: yes
+  shell: |
+    mkdir -p $HOME/.kube
+    [[ -f $HOME/.kube/config ]] || cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+    chown $(id -u):$(id -g) $HOME/.kube/config
+
+# Install calico CNI plugin
+- name: Install Calico
+  become: yes
+  shell: |
+    if [[ $(kubectl get ns calico-system) ]]
+    then
+        echo "Calico installation already ran once, Not executing again";
+        exit 0;
+    fi
+
+    #Install calico operator
+    kubectl create -f https://docs.projectcalico.org/manifests/tigera-operator.yaml
+    sleep 120 # Give operator installation time to finish
+
+    #Install calico custom resources after updating default pod cidr
+    wget https://docs.projectcalico.org/manifests/custom-resources.yaml
+    sed -i "s/192.*0\/16/172\.16\.0\.0\/20/" custom-resources.yaml
+    kubectl create -f custom-resources.yaml
+    rm custom-resources.yaml
+
+# Setup Calicoctl
+- name: Setup Calicoctl
+  become: yes
+  get_url:
+    dest: /usr/bin/
+    url: https://github.com/projectcalico/calicoctl/releases/download/v3.16.0/calicoctl
+    mode: a+x
+
+# Generate join command for worker nodes
+- name: generate Join Command
+  become: yes
+  shell: kubeadm token create --print-join-command 2>null
+  register: kubernetes_join_command
+
+- name: "Create dummy host to carry values across plays"
+  add_host:
+    name: "cross_play_host"
+    kubernetes_join_command: "{{ kubernetes_join_command.stdout }}"

@@ -1,0 +1,115 @@
+---
+# Tasks to be executed to setup all k8s nodes
+
+# Disable swap space
+- name: validate if swap is already disabled
+  become: yes
+  stat:
+    path: "/etc/fstab.bak"
+  register: fstab_backup
+
+- name: Disabe swap
+  become: yes
+  shell: |
+    swapoff -a
+    sed -i.bak '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
+    systemctl mask dev-sda2.swap
+  when: not fstab_backup.stat.exists
+
+# Set br_netfilter module to auto load at boot
+- name: validate if br_netfilter is already setup
+  become: yes
+  stat:
+    path: "/etc/modules-load.d/br_netfilter.conf"
+  register: netfilter_autoload
+
+- name: Setup br_netfilter
+  become: yes
+  command: modprobe br_netfilter
+  when: not netfilter_autoload.stat.exists
+
+- name: Add br_netfilter to auto load
+  become: yes
+  copy:
+    dest: "/etc/modules-load.d/br_netfilter.conf"
+    content: br_netfilter
+  when: not netfilter_autoload.stat.exists
+
+# Install required packages for docker
+- name: Install required pacakges
+  become: yes
+  package:
+    name:
+      - ca-certificates
+      - curl
+      - docker
+    state: present
+
+# start docker service and enable it
+- name: Enable Docker service
+  become: yes
+  service:
+    name: docker
+    enabled: yes
+    state: started
+
+# Update iptables configuration
+- name: Update iptables configuration
+  become: yes
+  copy:
+    dest: "/etc/sysctl.d/k8s.conf"
+    content: |
+      net.bridge.bridge-nf-call-ip6tables = 1
+      net.bridge.bridge-nf-call-iptables = 1
+
+- name: reconfigure sysctl
+  become: yes
+  command: sysctl --system
+
+# Disable SELinux
+- name: Disable SELinux
+  become: yes
+  shell: |
+    setenforce 0;
+    sed -i.bak 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config;
+
+# Add repo for kubernetes components
+- name: Add kubernetes repo
+  become: yes
+  copy:
+    dest: "/etc/yum.repos.d/kubernetes.repo"
+    content: |
+      [kubernetes]
+      name=Kubernetes
+      baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-\$basearch
+      enabled=1
+      gpgcheck=1
+      repo_gpgcheck=1
+      gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+
+# Install kubeadm kubelet and kubectl
+- name: Install required pacakges
+  become: yes
+  package:
+    name:
+      - kubelet
+      - kubeadm
+    state: present
+
+# start kubelet service and enable it
+- name: Enable kubelet service
+  become: yes
+  service:
+    name: kubelet
+    enabled: yes
+    state: restarted
+
+# add DNS records
+- name: update hosts file
+  become: yes
+  blockinfile:
+    path: /etc/hosts
+    block: |
+      192.168.0.41 masters.kubernetes.vm
+      192.168.0.41 centos78vm1
+      192.168.0.42 centos78vm2

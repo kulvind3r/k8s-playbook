@@ -1,0 +1,18 @@
+---
+# This playbook deploys the entire k8s stack.
+
+- name: configure and deploy the master node
+  hosts: master
+  remote_user: vagrant
+  tags: [ 'master' ]
+  roles:
+    - common
+    - master
+
+- name: configure and deploy the worker nodes
+  hosts: worker
+  remote_user: vagrant
+  tags: [ 'worker' ]
+  roles:
+    - common
+    - worker
